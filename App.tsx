@@ -1235,12 +1235,12 @@ const App: React.FC = () => {
                             onChange={(e) => setTryOnConfig({...tryOnConfig, backgroundPrompt: e.target.value})}
                           >
                             <option value={CUSTOM_BG_KEY}>{t.col2_bg_custom}</option>
-                            <optgroup label="????????? (Studio)">
+                            <optgroup label="專業棚景 (Studio)">
                               {STUDIO_STYLES.filter(s => s.category === 'STUDIO').map((style, idx) => (
                                 <option key={`studio-${idx}`} value={style.prompt}>{(style.label as any)[lang]}</option>
                               ))}
                             </optgroup>
-                            <optgroup label="??????????? (Location)">
+                            <optgroup label="真實場景 (Location)">
                               {STUDIO_STYLES.filter(s => s.category === 'LOCATION').map((style, idx) => (
                                 <option key={`loc-${idx}`} value={style.prompt}>{(style.label as any)[lang]}</option>
                               ))}
@@ -1416,10 +1416,10 @@ const App: React.FC = () => {
                        {resultType === 'generated' && lastSubmittedConfig && (
                          <div className="flex flex-wrap gap-2 justify-center w-full">
                             <span className="inline-flex items-center px-2.5 py-1 rounded-full text-sm font-medium bg-slate-100 text-slate-500 border border-slate-200">
-                               ??????{getBackgroundLabel(lastSubmittedConfig)}
+                               背景：{getBackgroundLabel(lastSubmittedConfig)}
                             </span>
                             <span className="inline-flex items-center px-2.5 py-1 rounded-full text-sm font-medium bg-slate-100 text-slate-500 border border-slate-200">
-                               ?? {getAspectRatioLabel(lastSubmittedConfig.aspectRatio)}
+                               比例：{getAspectRatioLabel(lastSubmittedConfig.aspectRatio)}
                             </span>
                          </div>
                        )}
