@@ -107,7 +107,7 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
             </div>
             <div className="space-y-1">
               <p className="text-sm font-medium text-slate-600">{label}</p>
-              <p className="text-xs text-slate-400">{dragText}</p>
+              <p className="text-sm text-slate-400">{dragText}</p>
             </div>
           </div>
         )}
@@ -125,3 +125,4 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
 };
 
 export default ImageUploader;
+

@@ -132,7 +132,7 @@ const ApiKeyModal: React.FC<ApiKeyModalProps> = ({
 
         <div className="rounded-2xl border border-[#D8D2E0] bg-[#F1EFF5] px-4 py-3">
           <div className="text-[#736281] font-medium mb-2">{text.securityTitle}</div>
-          <ul className="list-disc pl-4 text-xs text-[#756A83] space-y-1">
+          <ul className="list-disc pl-4 text-sm text-[#756A83] space-y-1">
             <li>{text.security1}</li>
             <li>{text.security2}</li>
             <li>{text.security3}</li>
@@ -167,3 +167,4 @@ const ApiKeyModal: React.FC<ApiKeyModalProps> = ({
 };
 
 export default ApiKeyModal;
+

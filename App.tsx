@@ -1,4 +1,4 @@
-﻿import React, { Suspense, lazy, useEffect, useState, useRef } from 'react';
+import React, { Suspense, lazy, useEffect, useState, useRef } from 'react';
 import ApiKeyModal from './components/ApiKeyModal';
 import ImageUploader from './components/ImageUploader';
 import Button from './components/Button';
@@ -11,10 +11,18 @@ import { CLOTHING_CATEGORIES, STUDIO_STYLES, ASPECT_RATIOS, CUSTOM_BG_KEY, TRANS
 import { STYLE_PRESETS } from './locales/stylePresets';
 
 const AnalysisModal = lazy(() => import('./components/AnalysisModal'));
+type UiTextSize = 'normal' | 'comfortable' | 'large';
+const UI_TEXT_SIZE_STORAGE_KEY = 'outfitlab_ui_text_size';
+const UI_TEXT_SIZE_MAP: Record<UiTextSize, string> = {
+  normal: '16px',
+  comfortable: '17px',
+  large: '18px'
+};
 
 const App: React.FC = () => {
   const [lang, setLang] = useState<Language>('zh');
   const t = TRANSLATIONS[lang];
+  const [uiTextSize, setUiTextSize] = useState<UiTextSize>('comfortable');
 
   const [isKeySet, setIsKeySet] = useState(false);
   const [apiKey, setApiKey] = useState('');
@@ -92,6 +100,18 @@ const App: React.FC = () => {
   };
 
   useEffect(() => {
+    const savedTextSize = localStorage.getItem(UI_TEXT_SIZE_STORAGE_KEY);
+    if (savedTextSize === 'normal' || savedTextSize === 'comfortable' || savedTextSize === 'large') {
+      setUiTextSize(savedTextSize);
+    }
+  }, []);
+
+  useEffect(() => {
+    document.documentElement.style.fontSize = UI_TEXT_SIZE_MAP[uiTextSize];
+    localStorage.setItem(UI_TEXT_SIZE_STORAGE_KEY, uiTextSize);
+  }, [uiTextSize]);
+
+  useEffect(() => {
     checkApiKey().then((hasKey) => {
       setIsKeySet(hasKey);
       if (hasKey) {
@@ -165,6 +185,10 @@ const App: React.FC = () => {
   };
 
   const maskedApiKey = apiKey ? `${apiKey.slice(0, 4)}...${apiKey.slice(-4)}` : "Not set";
+  const textSizeLabel = '字級';
+  const textSizeNormal = '一般';
+  const textSizeComfortable = '舒適';
+  const textSizeLarge = '大字';
 
   const isRequestAbortError = (error: unknown) => {
     const message = String((error as any)?.message || '').toLowerCase();
@@ -662,18 +686,18 @@ const App: React.FC = () => {
            allowClose={false}
          />
          
-         {/* Language Switcher for Modal */}
+                  {/* Language Switcher for Modal */}
          <div className="fixed top-4 right-4 z-[60]">
-             <select 
-               value={lang} 
-               onChange={(e) => setLang(e.target.value as Language)}
-               className="bg-white/90 backdrop-blur border border-slate-200 text-slate-700 text-sm rounded-lg p-2 shadow-md outline-none focus:ring-2 focus:ring-brand-500"
-             >
-                <option value="zh">繁體中文</option>
-                <option value="en">English</option>
-                <option value="ja">日本語</option>
-                <option value="ko">한국어</option>
-             </select>
+            <select
+              value={lang}
+              onChange={(e) => setLang(e.target.value as Language)}
+              className="bg-white/90 backdrop-blur border border-slate-200 text-slate-700 text-sm rounded-lg p-2 shadow-md outline-none focus:ring-2 focus:ring-brand-500"
+            >
+              <option value="zh">繁體中文</option>
+              <option value="en">English</option>
+              <option value="ja">日本語</option>
+              <option value="ko">한국어</option>
+            </select>
          </div>
       </div>
     );
@@ -746,81 +770,94 @@ const App: React.FC = () => {
           </div>
           <div>
             <h1 className="text-lg font-bold tracking-tight text-slate-800">{t.title}</h1>
-            <p className="text-xs text-slate-500">{t.subtitle}</p>
+            <p className="text-sm text-slate-500">{t.subtitle}</p>
           </div>
         </div>
         <div className="flex gap-3 items-center">
-             <select 
-               value={lang} 
-               onChange={(e) => setLang(e.target.value as Language)}
-               className="bg-white/80 border border-slate-200 text-slate-600 text-xs rounded-lg p-2 shadow-sm outline-none focus:ring-1 focus:ring-brand-500 hover:bg-white"
-             >
-                <option value="zh">繁體中文</option>
-                <option value="en">English</option>
-                <option value="ja">日本語</option>
-                <option value="ko">한국어</option>
-             </select>
+          <label className="text-sm text-slate-500 hidden md:block">{textSizeLabel}</label>
+          <select
+            value={uiTextSize}
+            onChange={(e) => setUiTextSize(e.target.value as UiTextSize)}
+            className="bg-white/80 border border-slate-200 text-slate-600 text-sm rounded-lg p-2 shadow-sm outline-none focus:ring-1 focus:ring-brand-500 hover:bg-white"
+            aria-label={textSizeLabel}
+          >
+            <option value="normal">{textSizeNormal}</option>
+            <option value="comfortable">{textSizeComfortable}</option>
+            <option value="large">{textSizeLarge}</option>
+          </select>
 
-             <a 
-               href="https://tingyusdeco.com" 
-               className="text-slate-500 hover:text-brand-600 hover:bg-white/50 p-2 rounded-xl transition-all duration-200 border border-transparent hover:border-slate-200"
-               title="Home"
-             >
-               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-6 h-6">
-                 <path d="M11.47 3.84a.75.75 0 011.06 0l8.69 8.69a.75.75 0 101.06-1.06l-8.689-8.69a2.25 2.25 0 00-3.182 0l-8.69 8.69a.75.75 0 001.061 1.06l8.69-8.69z" />
-                 <path d="M12 5.432l8.159 8.159c.03.03.06.058.091.086v6.198c0 1.035-.84 1.875-1.875 1.875H15a.75.75 0 01-.75-.75v-4.5a.75.75 0 00-.75-.75h-3a.75.75 0 00-.75.75V21a.75.75 0 01-.75.75H5.625a1.875 1.875 0 01-1.875-1.875v-6.198a2.29 2.29 0 00.091-.086L12 5.43z" />
-               </svg>
-             </a>
-             <div className="relative">
-               <button
-                 type="button"
-                 onClick={() => setShowApiKeyStatus((prev) => !prev)}
-                 className="relative text-slate-500 hover:text-brand-600 hover:bg-white/50 p-2 rounded-xl transition-all duration-200 border border-transparent hover:border-slate-200"
-                 title="API Key Status"
-               >
-                 <span className={`absolute right-1 top-1 h-2.5 w-2.5 rounded-full border border-white ${apiKey ? 'bg-emerald-500' : 'bg-rose-500'}`} />
-                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-6 h-6">
-                   <path fillRule="evenodd" d="M15.75 1.5a.75.75 0 01.75.75V4.5h.75a3.75 3.75 0 013.75 3.75v2.432a1.5 1.5 0 01-.44 1.06l-5.25 5.25a1.5 1.5 0 01-1.06.44H11.25a3.75 3.75 0 01-3.75-3.75V9.75A3.75 3.75 0 0111.25 6h.75V2.25a.75.75 0 01.75-.75h3zm-2.25 4.5h1.5V3h-1.5v3zm-2.25 1.5A2.25 2.25 0 009 9.75v3.932c0 .596.237 1.169.659 1.591a2.25 2.25 0 001.591.659h3.932a.75.75 0 00.53-.22l5.038-5.038V8.25A2.25 2.25 0 0018.5 6h-7.25z" clipRule="evenodd" />
-                   <path d="M5.03 13.97a.75.75 0 011.06 0l2.94 2.94a.75.75 0 11-1.06 1.06l-2.94-2.94a.75.75 0 010-1.06z" />
-                   <path d="M2.25 16.5a.75.75 0 00-.75.75v1.5A3.75 3.75 0 005.25 22.5h1.5a.75.75 0 000-1.5h-1.5A2.25 2.25 0 013 18.75v-1.5a.75.75 0 00-.75-.75z" />
-                 </svg>
-               </button>
-               {showApiKeyStatus && (
-                 <div className="absolute right-0 mt-2 w-72 rounded-2xl border border-slate-200 bg-white/95 backdrop-blur shadow-xl p-4 z-50">
-                   <div className="flex items-center justify-between">
-                      <p className="text-sm font-semibold text-slate-700">API Key Status</p>
-                     <span className={`text-xs font-medium ${apiKey ? 'text-emerald-600' : 'text-rose-600'}`}>
-                        {apiKey ? 'Connected' : 'Not Set'}
-                     </span>
-                   </div>
-                   <p className="text-xs text-slate-500 mt-2">Key: <span className="font-mono">{maskedApiKey}</span></p>
-                   <div className="mt-3 flex gap-2">
-                     <Button
-                       variant="secondary"
-                       className="flex-1 px-3 py-2 rounded-lg text-xs"
-                       onClick={() => {
-                         setShowApiKeyStatus(false);
-                         setShowApiKeyModal(true);
-                       }}
-                     >
-                        View / Edit
-                     </Button>
-                     <Button
-                       variant="outline"
-                       className="px-3 py-2 rounded-lg text-xs"
-                       onClick={() => {
-                         clearApiKey();
-                         setApiKey('');
-                         setIsKeySet(false);
-                         setShowApiKeyStatus(false);
-                       }}
-                     >
-                        Remove
-                     </Button>
-                   </div>
-                 </div>
-               )}
-             </div>
+          <select
+            value={lang}
+            onChange={(e) => setLang(e.target.value as Language)}
+            className="bg-white/80 border border-slate-200 text-slate-600 text-sm rounded-lg p-2 shadow-sm outline-none focus:ring-1 focus:ring-brand-500 hover:bg-white"
+          >
+            <option value="zh">繁體中文</option>
+            <option value="en">English</option>
+            <option value="ja">日本語</option>
+            <option value="ko">한국어</option>
+          </select>
+
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => setShowApiKeyStatus((prev) => !prev)}
+              className="relative text-slate-500 hover:text-brand-600 hover:bg-white/50 p-2 rounded-xl transition-all duration-200 border border-transparent hover:border-slate-200"
+              title="API Key Status"
+            >
+              <span className={`absolute right-1 top-1 h-2.5 w-2.5 rounded-full border border-white ${apiKey ? 'bg-emerald-500' : 'bg-rose-500'}`} />
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-6 h-6">
+                <path fillRule="evenodd" d="M15.75 1.5a.75.75 0 01.75.75V4.5h.75a3.75 3.75 0 013.75 3.75v2.432a1.5 1.5 0 01-.44 1.06l-5.25 5.25a1.5 1.5 0 01-1.06.44H11.25a3.75 3.75 0 01-3.75-3.75V9.75A3.75 3.75 0 0111.25 6h.75V2.25a.75.75 0 01.75-.75h3zm-2.25 4.5h1.5V3h-1.5v3zm-2.25 1.5A2.25 2.25 0 009 9.75v3.932c0 .596.237 1.169.659 1.591a2.25 2.25 0 001.591.659h3.932a.75.75 0 00.53-.22l5.038-5.038V8.25A2.25 2.25 0 0018.5 6h-7.25z" clipRule="evenodd" />
+                <path d="M5.03 13.97a.75.75 0 011.06 0l2.94 2.94a.75.75 0 11-1.06 1.06l-2.94-2.94a.75.75 0 010-1.06z" />
+                <path d="M2.25 16.5a.75.75 0 00-.75.75v1.5A3.75 3.75 0 005.25 22.5h1.5a.75.75 0 000-1.5h-1.5A2.25 2.25 0 013 18.75v-1.5a.75.75 0 00-.75-.75z" />
+              </svg>
+            </button>
+            {showApiKeyStatus && (
+              <div className="absolute right-0 mt-2 w-72 rounded-2xl border border-slate-200 bg-white/95 backdrop-blur shadow-xl p-4 z-50">
+                <div className="flex items-center justify-between">
+                  <p className="text-sm font-semibold text-slate-700">API Key Status</p>
+                  <span className={`text-sm font-medium ${apiKey ? 'text-emerald-600' : 'text-rose-600'}`}>
+                    {apiKey ? 'Connected' : 'Not Set'}
+                  </span>
+                </div>
+                <p className="text-sm text-slate-500 mt-2">Key: <span className="font-mono">{maskedApiKey}</span></p>
+                <div className="mt-3 flex gap-2">
+                  <Button
+                    variant="secondary"
+                    className="flex-1 px-3 py-2 rounded-lg text-sm"
+                    onClick={() => {
+                      setShowApiKeyStatus(false);
+                      setShowApiKeyModal(true);
+                    }}
+                  >
+                    View / Edit
+                  </Button>
+                  <Button
+                    variant="outline"
+                    className="px-3 py-2 rounded-lg text-sm"
+                    onClick={() => {
+                      clearApiKey();
+                      setApiKey('');
+                      setIsKeySet(false);
+                      setShowApiKeyStatus(false);
+                    }}
+                  >
+                    Remove
+                  </Button>
+                </div>
+              </div>
+            )}
+          </div>
+
+          <a
+            href="https://tingyusdeco.com"
+            className="text-slate-500 hover:text-brand-600 hover:bg-white/50 p-2 rounded-xl transition-all duration-200 border border-transparent hover:border-slate-200"
+            title="Home"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-6 h-6">
+              <path d="M11.47 3.84a.75.75 0 011.06 0l8.69 8.69a.75.75 0 101.06-1.06l-8.689-8.69a2.25 2.25 0 00-3.182 0l-8.69 8.69a.75.75 0 001.061 1.06l8.69-8.69z" />
+              <path d="M12 5.432l8.159 8.159c.03.03.06.058.091.086v6.198c0 1.035-.84 1.875-1.875 1.875H15a.75.75 0 01-.75-.75v-4.5a.75.75 0 00-.75-.75h-3a.75.75 0 00-.75.75V21a.75.75 0 01-.75.75H5.625a1.875 1.875 0 01-1.875-1.875v-6.198a2.29 2.29 0 00.091-.086L12 5.43z" />
+            </svg>
+          </a>
         </div>
       </header>
       
@@ -831,7 +868,7 @@ const App: React.FC = () => {
           {/* Column 1: The Model (Source) - Span 3 */}
           <div className="lg:col-span-3 flex flex-col gap-4 animate-fade-in">
              <div className="flex items-center gap-2 mb-1">
-                <span className="bg-panel text-slate-500 shadow-sm w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold border border-slate-200">1</span>
+                <span className="bg-panel text-slate-500 shadow-sm w-6 h-6 rounded-full flex items-center justify-center text-sm font-bold border border-slate-200">1</span>
                 <h2 className="font-bold text-slate-800">{t.col1_title}</h2>
              </div>
              
@@ -857,7 +894,7 @@ const App: React.FC = () => {
                   >
                     {t.col1_analyze_btn}
                   </Button>
-                  <p className="text-[10px] text-center text-slate-400 mt-2">
+                  <p className="text-sm text-center text-slate-400 mt-2">
                     {t.col1_analyze_desc}
                   </p>
                 </div>
@@ -872,19 +909,19 @@ const App: React.FC = () => {
                   <div className="flex p-1 bg-input rounded-xl border border-slate-200 shadow-inner-light mb-3">
                     <button 
                       onClick={() => setCol1ToolMode('extract')}
-                      className={`flex-1 py-1.5 text-[10px] font-medium rounded-lg transition-all truncate px-1 ${col1ToolMode === 'extract' ? 'bg-white text-brand-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+                      className={`flex-1 py-1.5 text-sm font-medium rounded-lg transition-all truncate px-1 ${col1ToolMode === 'extract' ? 'bg-white text-brand-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
                     >
                       {t.col1_tab_extract}
                     </button>
                     <button 
                       onClick={() => setCol1ToolMode('edit')}
-                      className={`flex-1 py-1.5 text-[10px] font-medium rounded-lg transition-all truncate px-1 ${col1ToolMode === 'edit' ? 'bg-white text-brand-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+                      className={`flex-1 py-1.5 text-sm font-medium rounded-lg transition-all truncate px-1 ${col1ToolMode === 'edit' ? 'bg-white text-brand-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
                     >
                       {t.col1_tab_edit}
                     </button>
                     <button 
                       onClick={() => setCol1ToolMode('recolor')}
-                      className={`flex-1 py-1.5 text-[10px] font-medium rounded-lg transition-all truncate px-1 ${col1ToolMode === 'recolor' ? 'bg-white text-brand-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+                      className={`flex-1 py-1.5 text-sm font-medium rounded-lg transition-all truncate px-1 ${col1ToolMode === 'recolor' ? 'bg-white text-brand-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
                     >
                       {t.col1_tab_recolor}
                     </button>
@@ -894,9 +931,9 @@ const App: React.FC = () => {
                   <div className="flex-1 flex flex-col gap-3">
                      {col1ToolMode === 'extract' ? (
                        <div className="flex flex-col gap-3 animate-fade-in h-full">
-                          <p className="text-xs text-slate-500 h-8 line-clamp-2">{t.col1_extract_desc}</p>
+                          <p className="text-sm text-slate-500 h-8 line-clamp-2">{t.col1_extract_desc}</p>
                           <select 
-                            className="w-full bg-input border border-slate-200 rounded-lg px-3 py-2 text-xs text-slate-700 focus:ring-1 focus:ring-brand-500 outline-none shadow-sm"
+                            className="w-full bg-input border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-700 focus:ring-1 focus:ring-brand-500 outline-none shadow-sm"
                             value={selectedExtractCategory}
                             onChange={(e) => setSelectedExtractCategory(e.target.value)}
                           >
@@ -906,7 +943,7 @@ const App: React.FC = () => {
                           {selectedExtractCategory === 'Other' && (
                             <input 
                               type="text" 
-                              className="w-full bg-input border border-slate-200 rounded-lg px-3 py-2 text-xs text-slate-700 focus:ring-1 focus:ring-brand-500 outline-none shadow-sm placeholder:text-slate-300"
+                              className="w-full bg-input border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-700 focus:ring-1 focus:ring-brand-500 outline-none shadow-sm placeholder:text-slate-300"
                               placeholder={t.col1_extract_placeholder}
                               value={customExtractInput}
                               onChange={(e) => setCustomExtractInput(e.target.value)}
@@ -925,9 +962,9 @@ const App: React.FC = () => {
                        </div>
                      ) : col1ToolMode === 'edit' ? (
                        <div className="flex flex-col gap-3 h-full animate-fade-in">
-                          <p className="text-xs text-slate-500 h-8 line-clamp-2">{t.col1_edit_desc}</p>
+                          <p className="text-sm text-slate-500 h-8 line-clamp-2">{t.col1_edit_desc}</p>
                           <textarea 
-                            className="w-full bg-input border border-slate-200 rounded-lg px-3 py-2 text-xs text-slate-700 focus:ring-1 focus:ring-brand-500 outline-none shadow-sm placeholder:text-slate-300 resize-none flex-1"
+                            className="w-full bg-input border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-700 focus:ring-1 focus:ring-brand-500 outline-none shadow-sm placeholder:text-slate-300 resize-none flex-1"
                             placeholder={t.col1_edit_placeholder}
                             value={magicEditInput}
                             onChange={(e) => setMagicEditInput(e.target.value)}
@@ -938,18 +975,18 @@ const App: React.FC = () => {
                             onClick={handleMagicEdit}
                             disabled={!baseImage || !magicEditInput.trim() || isProcessing}
                             isLoading={isProcessing && processingType === 'edit'}
-                            icon={<span className="text-xs">?</span>}
+                            icon={<span className="text-sm">✍️</span>}
                           >
                             {t.col1_edit_btn}
                           </Button>
                        </div>
                      ) : (
                        <div className="flex flex-col gap-3 h-full animate-fade-in">
-                          <p className="text-xs text-slate-500 line-clamp-2">{t.col1_recolor_desc}</p>
+                          <p className="text-sm text-slate-500 line-clamp-2">{t.col1_recolor_desc}</p>
                           
                           <input 
                             type="text" 
-                            className="w-full bg-input border border-slate-200 rounded-lg px-3 py-2 text-xs text-slate-700 focus:ring-1 focus:ring-brand-500 outline-none shadow-sm placeholder:text-slate-300"
+                            className="w-full bg-input border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-700 focus:ring-1 focus:ring-brand-500 outline-none shadow-sm placeholder:text-slate-300"
                             placeholder={t.col1_recolor_target_placeholder}
                             value={recolorTarget}
                             onChange={(e) => setRecolorTarget(e.target.value)}
@@ -963,7 +1000,7 @@ const App: React.FC = () => {
                                   style={{ backgroundColor: recolorValue.startsWith('#') ? recolorValue : '#ffffff' }}
                                 >
                                   {/* Fallback icon if no color selected or text entered */}
-                                  {!recolorValue.startsWith('#') && <span className="text-xs text-slate-400">?</span>}
+                                  {!recolorValue.startsWith('#') && <span className="text-sm text-slate-400">🎨</span>}
                                   
                                   <input 
                                     type="color" 
@@ -975,7 +1012,7 @@ const App: React.FC = () => {
                              <div className="flex-1">
                                 <input 
                                   type="text" 
-                                  className="w-full bg-input border border-slate-200 rounded-lg px-3 py-2 text-xs text-slate-700 focus:ring-1 focus:ring-brand-500 outline-none shadow-sm placeholder:text-slate-300"
+                                  className="w-full bg-input border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-700 focus:ring-1 focus:ring-brand-500 outline-none shadow-sm placeholder:text-slate-300"
                                   placeholder={t.col1_recolor_color_placeholder}
                                   value={recolorValue}
                                   onChange={(e) => setRecolorValue(e.target.value)}
@@ -989,7 +1026,7 @@ const App: React.FC = () => {
                             onClick={handleRecolor}
                             disabled={!baseImage || !recolorTarget.trim() || !recolorValue.trim() || isProcessing}
                             isLoading={isProcessing && processingType === 'edit'}
-                            icon={<span className="text-xs">🎨</span>}
+                            icon={<span className="text-sm">🎨</span>}
                           >
                             {t.col1_recolor_btn}
                           </Button>
@@ -1004,7 +1041,7 @@ const App: React.FC = () => {
           <div className="lg:col-span-4 flex flex-col gap-4 animate-fade-in" style={{animationDelay: '0.1s'}}>
              <div className="flex items-center justify-between mb-1">
                 <div className="flex items-center gap-2">
-                    <span className="bg-panel text-slate-500 shadow-sm w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold border border-slate-200">2</span>
+                    <span className="bg-panel text-slate-500 shadow-sm w-6 h-6 rounded-full flex items-center justify-center text-sm font-bold border border-slate-200">2</span>
                     <h2 className="font-bold text-slate-800">{t.col2_title}</h2>
                 </div>
              </div>
@@ -1015,13 +1052,13 @@ const App: React.FC = () => {
                 <div className="flex p-1 bg-input rounded-xl border border-slate-200 shadow-inner-light">
                   <button 
                     onClick={() => setInputMode('image')}
-                    className={`flex-1 py-1.5 text-xs font-medium rounded-lg transition-all ${inputMode === 'image' ? 'bg-white text-brand-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+                    className={`flex-1 py-1.5 text-sm font-medium rounded-lg transition-all ${inputMode === 'image' ? 'bg-white text-brand-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
                   >
                     {t.col2_tab_image}
                   </button>
                   <button 
                     onClick={() => setInputMode('text')}
-                    className={`flex-1 py-1.5 text-xs font-medium rounded-lg transition-all ${inputMode === 'text' ? 'bg-white text-brand-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+                    className={`flex-1 py-1.5 text-sm font-medium rounded-lg transition-all ${inputMode === 'text' ? 'bg-white text-brand-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
                   >
                     {t.col2_tab_text}
                   </button>
@@ -1043,7 +1080,7 @@ const App: React.FC = () => {
                       <div className="flex flex-col gap-3 h-full animate-fade-in">
                          {/* Quick Style Presets */}
                          <div className="mb-1">
-                            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5 block flex items-center gap-2">
+                            <label className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-1.5 block flex items-center gap-2">
                               <span>{t.col2_quick_styles}</span>
                               <span className="h-px bg-slate-200 flex-1"></span>
                             </label>
@@ -1055,7 +1092,7 @@ const App: React.FC = () => {
                                     setTextGarmentInput(preset.text);
                                     setTextGarmentCategory(preset.category);
                                   }}
-                                  className="text-[10px] px-2.5 py-1.5 bg-white border border-slate-200 hover:border-brand-400 hover:text-brand-600 hover:bg-brand-50 rounded-lg transition-all shadow-sm text-slate-600 whitespace-nowrap"
+                                  className="text-sm px-2.5 py-1.5 bg-white border border-slate-200 hover:border-brand-400 hover:text-brand-600 hover:bg-brand-50 rounded-lg transition-all shadow-sm text-slate-600 whitespace-nowrap"
                                 >
                                   {(preset.label as any)[lang] || preset.label.en}
                                 </button>
@@ -1066,7 +1103,7 @@ const App: React.FC = () => {
                          {/* Category Select for Text Item */}
                          <div className="flex gap-2">
                            <select 
-                              className="w-1/3 bg-input border border-slate-200 rounded-lg px-3 py-2 text-xs text-slate-700 focus:ring-1 focus:ring-brand-500 outline-none"
+                              className="w-1/3 bg-input border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-700 focus:ring-1 focus:ring-brand-500 outline-none"
                               value={textGarmentCategory}
                               onChange={(e) => setTextGarmentCategory(e.target.value)}
                            >
@@ -1074,7 +1111,7 @@ const App: React.FC = () => {
                            </select>
                            <input 
                               type="text"
-                              className="flex-1 bg-input border border-slate-200 rounded-lg px-3 py-2 text-xs text-slate-700 focus:ring-1 focus:ring-brand-500 outline-none placeholder:text-slate-400"
+                              className="flex-1 bg-input border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-700 focus:ring-1 focus:ring-brand-500 outline-none placeholder:text-slate-400"
                               placeholder={t.col2_desc_placeholder}
                               value={textGarmentInput}
                               onChange={(e) => setTextGarmentInput(e.target.value)}
@@ -1084,7 +1121,7 @@ const App: React.FC = () => {
                          {/* AI Recommendations Chips */}
                          {recommendations.length > 0 && (
                            <div className="flex flex-wrap gap-2 mt-1">
-                             <span className="text-[10px] text-slate-400 flex items-center">{t.col2_ai_rec}</span>
+                             <span className="text-sm text-slate-400 flex items-center">{t.col2_ai_rec}</span>
                              {recommendations.map((rec, idx) => (
                                <button 
                                  key={idx}
@@ -1093,7 +1130,7 @@ const App: React.FC = () => {
                                    // Try to guess category or default to 'Other'
                                    setTextGarmentCategory('Other');
                                  }}
-                                 className="text-[10px] bg-purple-50 hover:bg-purple-100 text-purple-600 border border-purple-200 rounded-full px-2 py-1 transition-colors text-left"
+                                 className="text-sm bg-purple-50 hover:bg-purple-100 text-purple-600 border border-purple-200 rounded-full px-2 py-1 transition-colors text-left"
                                >
                                  + {rec}
                                </button>
@@ -1103,7 +1140,7 @@ const App: React.FC = () => {
 
                          <Button 
                             variant="secondary" 
-                            className="w-full h-9 text-xs mt-auto"
+                            className="w-full h-9 text-sm mt-auto"
                             onClick={handleAddGarmentText}
                          >
                             {t.col2_add_btn}
@@ -1114,7 +1151,7 @@ const App: React.FC = () => {
 
                 {/* Scrollable List of Items */}
                 <div className="flex-1 overflow-y-auto pr-1 custom-scrollbar space-y-4 min-h-[200px] border-t border-slate-100 pt-4">
-                   <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">{t.col2_selected} ({garmentItems.length})</h3>
+                   <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-2">{t.col2_selected} ({garmentItems.length})</h3>
                    
                    {/* List of uploaded items */}
                    {garmentItems.map((item, index) => (
@@ -1133,7 +1170,7 @@ const App: React.FC = () => {
 
                         <div className="flex-1 min-w-0 space-y-2">
                            <div className="flex justify-between items-start">
-                             <span className="text-xs font-bold text-slate-400">Item #{index + 1}</span>
+                             <span className="text-sm font-bold text-slate-400">Item #{index + 1}</span>
                              <button 
                                onClick={() => handleRemoveGarment(item.id)}
                                className="text-slate-400 hover:text-red-400 p-1"
@@ -1143,9 +1180,9 @@ const App: React.FC = () => {
                            </div>
                            
                            <div>
-                             <label className="text-[10px] text-slate-500 block mb-1">{t.col2_item_label}</label>
+                             <label className="text-sm text-slate-500 block mb-1">{t.col2_item_label}</label>
                              <select 
-                                className="w-full bg-white border border-slate-200 rounded px-2 py-1.5 text-xs text-slate-700 focus:ring-1 focus:ring-brand-500 outline-none"
+                                className="w-full bg-white border border-slate-200 rounded px-2 py-1.5 text-sm text-slate-700 focus:ring-1 focus:ring-brand-500 outline-none"
                                 value={item.category}
                                 onChange={(e) => handleUpdateGarmentCategory(item.id, e.target.value)}
                               >
@@ -1158,7 +1195,7 @@ const App: React.FC = () => {
                               <input 
                                 type="text"
                                 placeholder={t.col2_desc_placeholder}
-                                className="w-full bg-white border border-slate-200 rounded px-2 py-1.5 text-xs text-slate-700 focus:ring-1 focus:ring-brand-500 outline-none mt-1 animate-fade-in placeholder:text-slate-300"
+                                className="w-full bg-white border border-slate-200 rounded px-2 py-1.5 text-sm text-slate-700 focus:ring-1 focus:ring-brand-500 outline-none mt-1 animate-fade-in placeholder:text-slate-300"
                                 value={item.customDescription || ""}
                                 onChange={(e) => handleUpdateGarmentDescription(item.id, e.target.value)}
                               />
@@ -1181,9 +1218,9 @@ const App: React.FC = () => {
                    {/* Background Config */}
                    <div className="space-y-2">
                       <div className="flex items-center justify-between">
-                         <label className="text-xs font-medium text-slate-500">{t.col2_bg_title}</label>
+                         <label className="text-sm font-medium text-slate-500">{t.col2_bg_title}</label>
                          <div className="flex items-center gap-2 cursor-pointer" onClick={() => setTryOnConfig(c => ({...c, keepBackground: !c.keepBackground}))}>
-                            <span className="text-[10px] text-slate-500">{tryOnConfig.keepBackground ? t.col2_bg_keep : t.col2_bg_change}</span>
+                            <span className="text-sm text-slate-500">{tryOnConfig.keepBackground ? t.col2_bg_keep : t.col2_bg_change}</span>
                             <div className={`w-8 h-4 rounded-full p-0.5 transition-colors ${tryOnConfig.keepBackground ? 'bg-brand-400' : 'bg-slate-300'}`}>
                               <div className={`w-3 h-3 rounded-full bg-white transition-transform shadow-sm ${tryOnConfig.keepBackground ? 'translate-x-4' : ''}`} />
                             </div>
@@ -1198,12 +1235,12 @@ const App: React.FC = () => {
                             onChange={(e) => setTryOnConfig({...tryOnConfig, backgroundPrompt: e.target.value})}
                           >
                             <option value={CUSTOM_BG_KEY}>{t.col2_bg_custom}</option>
-                            <optgroup label="撠平璉? (Studio)">
+                            <optgroup label="????????? (Studio)">
                               {STUDIO_STYLES.filter(s => s.category === 'STUDIO').map((style, idx) => (
                                 <option key={`studio-${idx}`} value={style.prompt}>{(style.label as any)[lang]}</option>
                               ))}
                             </optgroup>
-                            <optgroup label="?祕?湔 (Location)">
+                            <optgroup label="??????????? (Location)">
                               {STUDIO_STYLES.filter(s => s.category === 'LOCATION').map((style, idx) => (
                                 <option key={`loc-${idx}`} value={style.prompt}>{(style.label as any)[lang]}</option>
                               ))}
@@ -1212,7 +1249,7 @@ const App: React.FC = () => {
 
                           {tryOnConfig.backgroundPrompt === CUSTOM_BG_KEY && (
                             <textarea
-                              className="w-full bg-input border border-brand-200 rounded-lg px-3 py-2 text-slate-700 focus:ring-1 focus:ring-brand-500 outline-none text-xs min-h-[60px] shadow-sm placeholder:text-slate-300"
+                              className="w-full bg-input border border-brand-200 rounded-lg px-3 py-2 text-slate-700 focus:ring-1 focus:ring-brand-500 outline-none text-sm min-h-[60px] shadow-sm placeholder:text-slate-300"
                               placeholder={t.col2_bg_custom_placeholder}
                               value={customBgInput}
                               onChange={(e) => setCustomBgInput(e.target.value)}
@@ -1224,7 +1261,7 @@ const App: React.FC = () => {
                    
                    {/* Aspect Ratio */}
                    <div className="space-y-2">
-                       <label className="text-xs font-medium text-slate-500">{t.col2_ratio}</label>
+                       <label className="text-sm font-medium text-slate-500">{t.col2_ratio}</label>
                        <select 
                           className="w-full bg-input border border-slate-200 rounded-lg px-3 py-2.5 text-sm text-slate-700 focus:ring-1 focus:ring-brand-500 outline-none shadow-sm"
                           value={tryOnConfig.aspectRatio}
@@ -1254,7 +1291,7 @@ const App: React.FC = () => {
           {/* Column 3: The Studio (Result) - Span 5 */}
           <div className="lg:col-span-5 flex flex-col gap-4 animate-fade-in" style={{animationDelay: '0.2s'}}>
              <div className="flex items-center gap-2 mb-1">
-                <span className="bg-panel text-slate-500 shadow-sm w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold border border-slate-200">3</span>
+                <span className="bg-panel text-slate-500 shadow-sm w-6 h-6 rounded-full flex items-center justify-center text-sm font-bold border border-slate-200">3</span>
                 <h2 className="font-bold text-slate-800">{t.col3_title}</h2>
              </div>
 
@@ -1266,7 +1303,7 @@ const App: React.FC = () => {
                          <div className="w-20 h-20 relative mb-6">
                             <div className="absolute inset-0 border-4 border-slate-100 rounded-full"></div>
                             <div className="absolute inset-0 border-4 border-t-brand-500 rounded-full animate-spin"></div>
-                            <div className="absolute inset-0 flex items-center justify-center text-2xl animate-pulse">🧠</div>
+                            <div className="absolute inset-0 flex items-center justify-center text-2xl animate-pulse">??</div>
                          </div>
                          
                          {/* Dynamic Loading Message */}
@@ -1279,7 +1316,7 @@ const App: React.FC = () => {
                                   ? t.col3_loading_titles[2]
                                   : t.col3_loading_titles[1]}
                          </p>
-                         <p className="text-xs text-slate-400 mt-2">AI requires 10-15s</p>
+                         <p className="text-sm text-slate-400 mt-2">AI requires 10-15s</p>
                       </div>
                    ) : resultImage ? (
                       <>
@@ -1298,7 +1335,7 @@ const App: React.FC = () => {
                            <div className="absolute top-4 left-1/2 -translate-x-1/2 z-30">
                               <button
                                 className={`
-                                  flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-bold shadow-lg transition-all
+                                  flex items-center gap-2 px-4 py-1.5 rounded-full text-sm font-bold shadow-lg transition-all
                                   ${showOriginal 
                                      ? 'bg-brand-500 text-white scale-105' 
                                      : 'bg-white/80 backdrop-blur text-slate-600 hover:bg-white'
@@ -1329,7 +1366,7 @@ const App: React.FC = () => {
                            <svg className="w-10 h-10 text-slate-300" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
                          </div>
                          <p>{t.col3_waiting}</p>
-                         <p className="text-xs mt-1">{t.col3_waiting_desc}</p>
+                         <p className="text-sm mt-1">{t.col3_waiting_desc}</p>
                       </div>
                    )}
                 </div>
@@ -1363,13 +1400,13 @@ const App: React.FC = () => {
                           )}
 
                           {resultType === 'extracted' && (
-                             <Button variant="ghost" className="flex-1 text-xs h-10 px-3" onClick={handleUseResultAsGarment}>
+                             <Button variant="ghost" className="flex-1 text-sm h-10 px-3" onClick={handleUseResultAsGarment}>
                                {t.col3_btn_use} &rarr;
                              </Button>
                           )}
 
                           {resultType === 'edited' && (
-                             <Button variant="ghost" className="flex-1 text-xs h-10 px-3" onClick={handleApplyResultToModel}>
+                             <Button variant="ghost" className="flex-1 text-sm h-10 px-3" onClick={handleApplyResultToModel}>
                                {t.col3_btn_apply_model}
                              </Button>
                           )}
@@ -1378,10 +1415,10 @@ const App: React.FC = () => {
                        {/* Compact Meta Data Pills */}
                        {resultType === 'generated' && lastSubmittedConfig && (
                          <div className="flex flex-wrap gap-2 justify-center w-full">
-                            <span className="inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-medium bg-slate-100 text-slate-500 border border-slate-200">
-                               ?儭?{getBackgroundLabel(lastSubmittedConfig)}
+                            <span className="inline-flex items-center px-2.5 py-1 rounded-full text-sm font-medium bg-slate-100 text-slate-500 border border-slate-200">
+                               ??????{getBackgroundLabel(lastSubmittedConfig)}
                             </span>
-                            <span className="inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-medium bg-slate-100 text-slate-500 border border-slate-200">
+                            <span className="inline-flex items-center px-2.5 py-1 rounded-full text-sm font-medium bg-slate-100 text-slate-500 border border-slate-200">
                                ?? {getAspectRatioLabel(lastSubmittedConfig.aspectRatio)}
                             </span>
                          </div>
@@ -1393,7 +1430,7 @@ const App: React.FC = () => {
                         <div className="border-t border-slate-100 pt-2 animate-fade-in">
                            <button 
                              onClick={() => setShowDetails(!showDetails)}
-                             className="w-full text-center text-xs text-brand-500 hover:text-brand-600 font-medium py-2 flex items-center justify-center gap-1 transition-colors"
+                             className="w-full text-center text-sm text-brand-500 hover:text-brand-600 font-medium py-2 flex items-center justify-center gap-1 transition-colors"
                            >
                               {showDetails ? t.col3_hide_details : t.col3_view_details}
                               <svg className={`w-3 h-3 transition-transform ${showDetails ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -1410,7 +1447,7 @@ const App: React.FC = () => {
                                          {item.image && <img src={`data:image/jpeg;base64,${item.image}`} className="w-full h-full object-cover" alt="item" />}
                                       </div>
                                       <div className="flex-1 min-w-0">
-                                         <p className="text-xs font-bold text-slate-700">
+                                         <p className="text-sm font-bold text-slate-700">
                                            {CLOTHING_CATEGORIES.find(c => c.id === item.category)?.zh || item.category}
                                          </p>
                                       </div>
@@ -1419,10 +1456,10 @@ const App: React.FC = () => {
                                  {usedTextItems.map((item) => (
                                    <div key={item.id} className="flex items-center gap-3 p-3 bg-white">
                                       <div className="w-8 h-8 rounded-lg bg-brand-50 border border-brand-100 flex items-center justify-center text-brand-500 flex-shrink-0">
-                                         <span className="text-xs font-bold">Aa</span>
+                                         <span className="text-sm font-bold">Aa</span>
                                       </div>
                                       <div className="flex-1 min-w-0">
-                                         <p className="text-xs font-bold text-slate-700 break-words line-clamp-1">
+                                         <p className="text-sm font-bold text-slate-700 break-words line-clamp-1">
                                            {item.customDescription}
                                          </p>
                                       </div>
@@ -1438,11 +1475,11 @@ const App: React.FC = () => {
                      {history.length > 0 && (
                         <div className="pt-2 border-t border-slate-100 animate-fade-in">
                           <div className="flex items-center justify-between px-1 pb-1">
-                            <p className="text-[10px] uppercase tracking-wider text-slate-400">History</p>
+                            <p className="text-sm uppercase tracking-wider text-slate-400">History</p>
                             <button
                               type="button"
                               onClick={handleClearHistory}
-                              className="text-[10px] text-rose-500 hover:text-rose-600"
+                              className="text-sm text-rose-500 hover:text-rose-600"
                             >
                               Clear All
                             </button>
@@ -1460,7 +1497,7 @@ const App: React.FC = () => {
                                   <img src={item.resultImage} className="w-full h-full object-cover" alt="History" />
                                   {item.type !== 'generated' && (
                                     <div className="absolute top-0 right-0 p-0.5 bg-black/40 rounded-bl-md">
-                                      <span className="text-[8px] text-white px-1">
+                                      <span className="text-sm text-white px-1">
                                         {item.type === 'extracted' ? 'Cut' : 'Edit'}
                                       </span>
                                     </div>
@@ -1469,10 +1506,10 @@ const App: React.FC = () => {
                                 <button
                                   type="button"
                                   onClick={() => handleDeleteHistoryItem(item.id)}
-                                  className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-white border border-rose-300 text-rose-500 text-[10px] leading-none"
+                                  className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-white border border-rose-300 text-rose-500 text-sm leading-none"
                                   aria-label="Delete history item"
                                 >
-                                  ×
+                                  ?
                                 </button>
                               </div>
                             ))}
@@ -1490,5 +1527,6 @@ const App: React.FC = () => {
 };
 
 export default App;
+
 
 

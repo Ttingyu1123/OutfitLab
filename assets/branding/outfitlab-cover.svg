@@ -1,0 +1,98 @@
+﻿<svg width="1920" height="1080" viewBox="0 0 1920 1080" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="120" y1="90" x2="1760" y2="980" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#F6F0FF"/>
+      <stop offset="0.48" stop-color="#EFF8FF"/>
+      <stop offset="1" stop-color="#E9FFF5"/>
+    </linearGradient>
+    <radialGradient id="orb1" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(1390 210) rotate(121) scale(620 860)">
+      <stop stop-color="#B088F9" stop-opacity="0.72"/>
+      <stop offset="1" stop-color="#B088F9" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="orb2" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(400 920) rotate(272) scale(520 800)">
+      <stop stop-color="#6EE7D7" stop-opacity="0.48"/>
+      <stop offset="1" stop-color="#6EE7D7" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="cardStroke" x1="380" y1="178" x2="1570" y2="920" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFFFFF" stop-opacity="0.95"/>
+      <stop offset="1" stop-color="#CFC4E7" stop-opacity="0.65"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#A974F8"/>
+      <stop offset="1" stop-color="#58D5BE"/>
+    </linearGradient>
+    <filter id="glow" x="-30%" y="-30%" width="160%" height="160%" color-interpolation-filters="sRGB">
+      <feGaussianBlur stdDeviation="14" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    <filter id="softShadow" x="-10%" y="-10%" width="140%" height="140%" color-interpolation-filters="sRGB">
+      <feDropShadow dx="0" dy="24" stdDeviation="28" flood-color="#8B7AAE" flood-opacity="0.22"/>
+    </filter>
+  </defs>
+
+  <rect width="1920" height="1080" fill="url(#bg)"/>
+  <rect width="1920" height="1080" fill="url(#orb1)"/>
+  <rect width="1920" height="1080" fill="url(#orb2)"/>
+
+  <g opacity="0.45">
+    <path d="M1540 110C1448 198 1384 352 1382 520" stroke="#FFFFFF" stroke-width="2"/>
+    <path d="M1620 180C1512 286 1432 430 1420 612" stroke="#CFC3E8" stroke-width="2"/>
+    <path d="M1280 828C1432 764 1514 664 1568 520" stroke="#C6F2E8" stroke-width="2"/>
+  </g>
+
+  <g filter="url(#softShadow)">
+    <rect x="210" y="132" width="1500" height="816" rx="48" fill="#FFFFFF" fill-opacity="0.54"/>
+    <rect x="210.8" y="132.8" width="1498.4" height="814.4" rx="47.2" stroke="url(#cardStroke)" stroke-width="1.6"/>
+  </g>
+
+  <g transform="translate(296 226)">
+    <rect x="0" y="0" width="180" height="48" rx="24" fill="#FFFFFF" fill-opacity="0.7"/>
+    <text x="90" y="31" text-anchor="middle" font-family="'Segoe UI', 'Noto Sans TC', sans-serif" font-size="22" font-weight="600" fill="#7E64A8">AI FASHION LAB</text>
+
+    <text x="0" y="138" font-family="'Segoe UI', 'Noto Sans TC', sans-serif" font-size="98" font-weight="800" fill="#352B49">OutfitLab</text>
+    <rect x="0" y="154" width="720" height="10" rx="5" fill="url(#accent)"/>
+
+    <text x="0" y="226" font-family="'Segoe UI', 'Noto Sans TC', sans-serif" font-size="42" font-weight="600" fill="#4D4266">你的個人 AI 穿搭實驗室</text>
+    <text x="0" y="286" font-family="'Segoe UI', 'Noto Sans TC', sans-serif" font-size="30" font-weight="500" fill="#6B5F84">上傳照片，快速試穿、改色、修圖與風格探索</text>
+
+    <g transform="translate(0 350)">
+      <rect x="0" y="0" width="314" height="72" rx="20" fill="#FFFFFF" fill-opacity="0.78"/>
+      <rect x="0.8" y="0.8" width="312.4" height="70.4" rx="19.2" stroke="#D6C9E7" stroke-width="1.6"/>
+      <text x="28" y="45" font-family="'Segoe UI', 'Noto Sans TC', sans-serif" font-size="28" font-weight="700" fill="#5F4D82">Virtual Try-On</text>
+
+      <rect x="338" y="0" width="278" height="72" rx="20" fill="#FFFFFF" fill-opacity="0.78"/>
+      <rect x="338.8" y="0.8" width="276.4" height="70.4" rx="19.2" stroke="#BCDCDD" stroke-width="1.6"/>
+      <text x="366" y="45" font-family="'Segoe UI', 'Noto Sans TC', sans-serif" font-size="28" font-weight="700" fill="#477F79">Recolor</text>
+
+      <rect x="640" y="0" width="244" height="72" rx="20" fill="#FFFFFF" fill-opacity="0.78"/>
+      <rect x="640.8" y="0.8" width="242.4" height="70.4" rx="19.2" stroke="#E4CFE2" stroke-width="1.6"/>
+      <text x="668" y="45" font-family="'Segoe UI', 'Noto Sans TC', sans-serif" font-size="28" font-weight="700" fill="#8C4A78">Magic Edit</text>
+    </g>
+
+    <text x="0" y="520" font-family="'Segoe UI', 'Noto Sans TC', sans-serif" font-size="23" font-weight="500" fill="#6F6685">Powered by Gemini Image Models · BYOK Secure Flow · Creator-ready Output</text>
+  </g>
+
+  <g transform="translate(1230 200)">
+    <rect x="0" y="0" width="360" height="600" rx="42" fill="#171622" fill-opacity="0.93"/>
+    <rect x="10" y="10" width="340" height="580" rx="34" fill="#201C2E"/>
+
+    <rect x="30" y="48" width="300" height="430" rx="28" fill="#F9E8D6"/>
+    <ellipse cx="180" cy="188" rx="84" ry="90" fill="#F2C8AA"/>
+    <rect x="96" y="252" width="168" height="206" rx="82" fill="#5C3D86"/>
+    <path d="M104 316C127 288 158 274 182 272C210 269 238 283 255 307" stroke="#D2BAF5" stroke-width="10" stroke-linecap="round"/>
+    <rect x="115" y="348" width="130" height="96" rx="38" fill="#6EC4B0" fill-opacity="0.9"/>
+
+    <g filter="url(#glow)">
+      <circle cx="286" cy="108" r="24" fill="#B27AFF" fill-opacity="0.85"/>
+      <circle cx="300" cy="128" r="5" fill="#FFFFFF"/>
+    </g>
+
+    <rect x="42" y="506" width="276" height="58" rx="18" fill="#FFFFFF" fill-opacity="0.11"/>
+    <text x="182" y="543" text-anchor="middle" font-family="'Segoe UI', 'Noto Sans TC', sans-serif" font-size="24" font-weight="600" fill="#E8DEF8">Mix &amp; Match</text>
+  </g>
+
+  <text x="1630" y="1010" text-anchor="end" font-family="'Segoe UI', 'Noto Sans TC', sans-serif" font-size="26" font-weight="600" fill="#736987" opacity="0.88">OUTFITLAB</text>
+</svg>
