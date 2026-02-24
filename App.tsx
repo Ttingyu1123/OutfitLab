@@ -3,9 +3,9 @@ import ApiKeyModal from './components/ApiKeyModal';
 import ImageUploader from './components/ImageUploader';
 import Button from './components/Button';
 import ToastContainer, { ToastMessage, ToastType } from './components/Toast';
-import { AppMode, TryOnConfig, GarmentItem, Language } from './types';
+import { AppMode, TryOnConfig, GarmentItem, Language, AIProvider } from './types';
 import { HistoryItem } from './types/history';
-import { checkApiKey, extractClothingItem, generateTryOn, analyzeOutfit, editModelImage, getStoredApiKey, clearApiKey, isAuthError } from './services/geminiService';
+import { checkApiKey, extractClothingItem, generateTryOn, analyzeOutfit, editModelImage, getStoredApiKey, clearApiKey, isAuthError, getStoredProvider, saveProvider } from './services/geminiService';
 import { loadHistoryFromDb, saveHistoryToDb } from './services/historyStorage';
 import { CLOTHING_CATEGORIES, STUDIO_STYLES, ASPECT_RATIOS, CUSTOM_BG_KEY, TRANSLATIONS } from './constants';
 import { STYLE_PRESETS } from './locales/stylePresets';
@@ -26,8 +26,8 @@ const App: React.FC = () => {
 
   const [isKeySet, setIsKeySet] = useState(false);
   const [apiKey, setApiKey] = useState('');
+  const [apiProvider, setApiProvider] = useState<AIProvider>('gemini');
   const [showApiKeyModal, setShowApiKeyModal] = useState(false);
-  const [showApiKeyStatus, setShowApiKeyStatus] = useState(false);
   
   // Reset Key used to force re-render of components with internal state (like ImageUploader)
   const [resetKey, setResetKey] = useState(0);
@@ -112,10 +112,12 @@ const App: React.FC = () => {
   }, [uiTextSize]);
 
   useEffect(() => {
-    checkApiKey().then((hasKey) => {
+    const provider = getStoredProvider();
+    setApiProvider(provider);
+    checkApiKey(provider).then((hasKey) => {
       setIsKeySet(hasKey);
       if (hasKey) {
-        setApiKey(getStoredApiKey());
+        setApiKey(getStoredApiKey(provider));
       }
     });
   }, []);
@@ -184,11 +186,11 @@ const App: React.FC = () => {
     return ratio ? ratio.label : ratioId;
   };
 
-  const maskedApiKey = apiKey ? `${apiKey.slice(0, 4)}...${apiKey.slice(-4)}` : "Not set";
-  const textSizeLabel = '字級';
-  const textSizeNormal = '一般';
+  const textSizeLabel = '文字大小';
+  const textSizeNormal = '標準';
   const textSizeComfortable = '舒適';
-  const textSizeLarge = '大字';
+  const textSizeLarge = '較大';
+  const providerLabel = apiProvider === 'gemini' ? 'Google Gemini' : 'OpenAI';
 
   const isRequestAbortError = (error: unknown) => {
     const message = String((error as any)?.message || '').toLowerCase();
@@ -209,12 +211,18 @@ const App: React.FC = () => {
   };
 
   const handleAuthFailure = (fallbackMessage: string) => {
-    clearApiKey();
+    clearApiKey(apiProvider);
     setApiKey('');
     setIsKeySet(false);
     setShowApiKeyModal(false);
-    setShowApiKeyStatus(false);
     addToast(fallbackMessage, 'error');
+  };
+
+  const ensureApiKeyReady = () => {
+    if (apiKey.trim()) return true;
+    setShowApiKeyModal(true);
+    addToast("Please connect API key first.", "warning");
+    return false;
   };
 
   // --- Handlers ---
@@ -224,6 +232,7 @@ const App: React.FC = () => {
       addToast(t.toast_upload_warning, 'warning');
       return;
     }
+    if (!ensureApiKeyReady()) return;
     
     setIsAnalysisOpen(true);
     setAnalysisResult(null);
@@ -233,7 +242,7 @@ const App: React.FC = () => {
     const controller = startRequestController();
 
     try {
-      const result = await analyzeOutfit(apiKey, baseImage, lang, controller.signal);
+      const result = await analyzeOutfit(apiKey, baseImage, lang, controller.signal, apiProvider);
       setAnalysisResult(result);
 
       const jsonMatch = result.match(/```json\s*([\s\S]*?)\s*```/);
@@ -270,6 +279,7 @@ const App: React.FC = () => {
       addToast(t.toast_upload_warning, 'warning');
       return;
     }
+    if (!ensureApiKeyReady()) return;
     
     setIsProcessing(true);
     setProcessingType('extract');
@@ -284,7 +294,7 @@ const App: React.FC = () => {
     }
 
     try {
-      const result = await extractClothingItem(apiKey, baseImage, targetDescription, controller.signal);
+      const result = await extractClothingItem(apiKey, baseImage, targetDescription, controller.signal, apiProvider);
       setResultImage(result);
       setResultType('extracted');
 
@@ -323,6 +333,7 @@ const App: React.FC = () => {
       return;
     }
     if (!magicEditInput.trim()) return;
+    if (!ensureApiKeyReady()) return;
 
     setIsProcessing(true);
     setProcessingType('edit');
@@ -330,7 +341,7 @@ const App: React.FC = () => {
     const controller = startRequestController();
 
     try {
-      const result = await editModelImage(apiKey, baseImage, magicEditInput, controller.signal);
+      const result = await editModelImage(apiKey, baseImage, magicEditInput, controller.signal, apiProvider);
       // const rawBase64 = result.replace(/^data:image\/[a-z]+;base64,/, "");
       
       // Removed auto-update of baseImage
@@ -374,6 +385,7 @@ const App: React.FC = () => {
       return;
     }
     if (!recolorTarget.trim() || !recolorValue.trim()) return;
+    if (!ensureApiKeyReady()) return;
 
     setIsProcessing(true);
     setProcessingType('edit'); // Reuse edit type for loading message
@@ -383,7 +395,7 @@ const App: React.FC = () => {
     const prompt = `Change the color of the ${recolorTarget} to ${recolorValue}. IMPORTANT: Keep the original material texture, shading, and lighting exact. Only change the hue/saturation.`;
 
     try {
-      const result = await editModelImage(apiKey, baseImage, prompt, controller.signal);
+      const result = await editModelImage(apiKey, baseImage, prompt, controller.signal, apiProvider);
       // const rawBase64 = result.replace(/^data:image\/[a-z]+;base64,/, "");
       
       // Removed auto-update of baseImage
@@ -473,6 +485,7 @@ const App: React.FC = () => {
       addToast(t.toast_garment_warning, 'warning');
       return;
     }
+    if (!ensureApiKeyReady()) return;
 
     for (const item of garmentItems) {
       if (item.category === 'Other' && !item.customDescription?.trim()) {
@@ -506,7 +519,7 @@ const App: React.FC = () => {
     setLastSubmittedConfig(finalConfig);
 
     try {
-      const result = await generateTryOn(apiKey, baseImage, currentItems, finalConfig, controller.signal);
+      const result = await generateTryOn(apiKey, baseImage, currentItems, finalConfig, controller.signal, apiProvider);
       setResultImage(result);
       setResultType('generated');
       
@@ -672,53 +685,31 @@ const App: React.FC = () => {
   const usedImageItems = lastSubmittedItems.filter(item => item.type === 'image');
 
   // --- Render Components ---
-
-  if (!isKeySet) {
-    return (
-      <div className="min-h-screen bg-page text-slate-700 font-sans selection:bg-brand-500/30">
-         <ApiKeyModal
-           onSuccess={(nextKey) => {
-             setApiKey(nextKey);
-             setIsKeySet(true);
-           }}
-           lang={lang}
-           initialValue={apiKey}
-           allowClose={false}
-         />
-         
-                  {/* Language Switcher for Modal */}
-         <div className="fixed top-4 right-4 z-[60]">
-            <select
-              value={lang}
-              onChange={(e) => setLang(e.target.value as Language)}
-              className="bg-white/90 backdrop-blur border border-slate-200 text-slate-700 text-sm rounded-lg p-2 shadow-md outline-none focus:ring-2 focus:ring-brand-500"
-            >
-              <option value="zh">繁體中文</option>
-              <option value="en">English</option>
-              <option value="ja">日本語</option>
-              <option value="ko">한국어</option>
-            </select>
-         </div>
-      </div>
-    );
-  }
-
   return (
     <div className="min-h-screen bg-page text-slate-700 font-sans selection:bg-brand-200 flex flex-col">
       <ToastContainer toasts={toasts} removeToast={removeToast} />
 
       {showApiKeyModal && (
         <ApiKeyModal
-          onSuccess={(nextKey) => {
+          onSuccess={(nextKey, nextProvider) => {
+            saveProvider(nextProvider);
+            setApiProvider(nextProvider);
             setApiKey(nextKey);
             setIsKeySet(true);
             setShowApiKeyModal(false);
             addToast("API key updated.", "success");
           }}
           onClose={() => setShowApiKeyModal(false)}
+          provider={apiProvider}
+          onProviderChange={(nextProvider) => {
+            saveProvider(nextProvider);
+            setApiProvider(nextProvider);
+            const nextKey = getStoredApiKey(nextProvider);
+            setApiKey(nextKey);
+            setIsKeySet(Boolean(nextKey));
+          }}
           lang={lang}
           initialValue={apiKey}
-          allowClose={true}
         />
       )}
       
@@ -797,56 +788,23 @@ const App: React.FC = () => {
             <option value="ko">한국어</option>
           </select>
 
-          <div className="relative">
-            <button
-              type="button"
-              onClick={() => setShowApiKeyStatus((prev) => !prev)}
-              className="relative text-slate-500 hover:text-brand-600 hover:bg-white/50 p-2 rounded-xl transition-all duration-200 border border-transparent hover:border-slate-200"
-              title="API Key Status"
-            >
-              <span className={`absolute right-1 top-1 h-2.5 w-2.5 rounded-full border border-white ${apiKey ? 'bg-emerald-500' : 'bg-rose-500'}`} />
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-6 h-6">
-                <path fillRule="evenodd" d="M15.75 1.5a.75.75 0 01.75.75V4.5h.75a3.75 3.75 0 013.75 3.75v2.432a1.5 1.5 0 01-.44 1.06l-5.25 5.25a1.5 1.5 0 01-1.06.44H11.25a3.75 3.75 0 01-3.75-3.75V9.75A3.75 3.75 0 0111.25 6h.75V2.25a.75.75 0 01.75-.75h3zm-2.25 4.5h1.5V3h-1.5v3zm-2.25 1.5A2.25 2.25 0 009 9.75v3.932c0 .596.237 1.169.659 1.591a2.25 2.25 0 001.591.659h3.932a.75.75 0 00.53-.22l5.038-5.038V8.25A2.25 2.25 0 0018.5 6h-7.25z" clipRule="evenodd" />
-                <path d="M5.03 13.97a.75.75 0 011.06 0l2.94 2.94a.75.75 0 11-1.06 1.06l-2.94-2.94a.75.75 0 010-1.06z" />
-                <path d="M2.25 16.5a.75.75 0 00-.75.75v1.5A3.75 3.75 0 005.25 22.5h1.5a.75.75 0 000-1.5h-1.5A2.25 2.25 0 013 18.75v-1.5a.75.75 0 00-.75-.75z" />
-              </svg>
-            </button>
-            {showApiKeyStatus && (
-              <div className="absolute right-0 mt-2 w-72 rounded-2xl border border-slate-200 bg-white/95 backdrop-blur shadow-xl p-4 z-50">
-                <div className="flex items-center justify-between">
-                  <p className="text-sm font-semibold text-slate-700">API Key Status</p>
-                  <span className={`text-sm font-medium ${apiKey ? 'text-emerald-600' : 'text-rose-600'}`}>
-                    {apiKey ? 'Connected' : 'Not Set'}
-                  </span>
-                </div>
-                <p className="text-sm text-slate-500 mt-2">Key: <span className="font-mono">{maskedApiKey}</span></p>
-                <div className="mt-3 flex gap-2">
-                  <Button
-                    variant="secondary"
-                    className="flex-1 px-3 py-2 rounded-lg text-sm"
-                    onClick={() => {
-                      setShowApiKeyStatus(false);
-                      setShowApiKeyModal(true);
-                    }}
-                  >
-                    View / Edit
-                  </Button>
-                  <Button
-                    variant="outline"
-                    className="px-3 py-2 rounded-lg text-sm"
-                    onClick={() => {
-                      clearApiKey();
-                      setApiKey('');
-                      setIsKeySet(false);
-                      setShowApiKeyStatus(false);
-                    }}
-                  >
-                    Remove
-                  </Button>
-                </div>
-              </div>
-            )}
-          </div>
+          <span className="hidden md:inline-flex items-center rounded-full border border-slate-200 bg-white/80 px-3 py-1 text-xs text-slate-600">
+            Provider: {providerLabel}
+          </span>
+
+          <button
+            type="button"
+            onClick={() => setShowApiKeyModal(true)}
+            className="relative text-slate-500 hover:text-brand-600 hover:bg-white/50 p-2 rounded-xl transition-all duration-200 border border-transparent hover:border-slate-200"
+            title="API Key Settings"
+          >
+            <span className={`absolute right-1 top-1 h-2.5 w-2.5 rounded-full border border-white ${apiKey ? 'bg-emerald-500' : 'bg-rose-500'}`} />
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-6 h-6">
+              <path fillRule="evenodd" d="M15.75 1.5a.75.75 0 01.75.75V4.5h.75a3.75 3.75 0 013.75 3.75v2.432a1.5 1.5 0 01-.44 1.06l-5.25 5.25a1.5 1.5 0 01-1.06.44H11.25a3.75 3.75 0 01-3.75-3.75V9.75A3.75 3.75 0 0111.25 6h.75V2.25a.75.75 0 01.75-.75h3zm-2.25 4.5h1.5V3h-1.5v3zm-2.25 1.5A2.25 2.25 0 009 9.75v3.932c0 .596.237 1.169.659 1.591a2.25 2.25 0 001.591.659h3.932a.75.75 0 00.53-.22l5.038-5.038V8.25A2.25 2.25 0 0018.5 6h-7.25z" clipRule="evenodd" />
+              <path d="M5.03 13.97a.75.75 0 011.06 0l2.94 2.94a.75.75 0 11-1.06 1.06l-2.94-2.94a.75.75 0 010-1.06z" />
+              <path d="M2.25 16.5a.75.75 0 00-.75.75v1.5A3.75 3.75 0 005.25 22.5h1.5a.75.75 0 000-1.5h-1.5A2.25 2.25 0 013 18.75v-1.5a.75.75 0 00-.75-.75z" />
+            </svg>
+          </button>
 
           <a
             href="https://tingyusdeco.com"
@@ -890,7 +848,7 @@ const App: React.FC = () => {
                     className="w-full bg-brand-500 hover:bg-brand-600 text-white shadow-md border-0"
                     onClick={handleAnalyze}
                     disabled={!baseImage || isProcessing}
-                    icon={<span className="text-lg">✨</span>}
+                    icon={<span className="text-lg">AI</span>}
                   >
                     {t.col1_analyze_btn}
                   </Button>
@@ -975,7 +933,7 @@ const App: React.FC = () => {
                             onClick={handleMagicEdit}
                             disabled={!baseImage || !magicEditInput.trim() || isProcessing}
                             isLoading={isProcessing && processingType === 'edit'}
-                            icon={<span className="text-sm">✍️</span>}
+                            icon={<span className="text-sm">Edit</span>}
                           >
                             {t.col1_edit_btn}
                           </Button>
@@ -1000,7 +958,7 @@ const App: React.FC = () => {
                                   style={{ backgroundColor: recolorValue.startsWith('#') ? recolorValue : '#ffffff' }}
                                 >
                                   {/* Fallback icon if no color selected or text entered */}
-                                  {!recolorValue.startsWith('#') && <span className="text-sm text-slate-400">🎨</span>}
+                                  {!recolorValue.startsWith('#') && <span className="text-sm text-slate-400">Color</span>}
                                   
                                   <input 
                                     type="color" 
@@ -1026,7 +984,7 @@ const App: React.FC = () => {
                             onClick={handleRecolor}
                             disabled={!baseImage || !recolorTarget.trim() || !recolorValue.trim() || isProcessing}
                             isLoading={isProcessing && processingType === 'edit'}
-                            icon={<span className="text-sm">🎨</span>}
+                            icon={<span className="text-sm">Color</span>}
                           >
                             {t.col1_recolor_btn}
                           </Button>
@@ -1527,6 +1485,8 @@ const App: React.FC = () => {
 };
 
 export default App;
+
+
 
 
 

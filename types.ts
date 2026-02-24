@@ -8,6 +8,7 @@ export interface ClothingCategory {
 }
 
 export type Language = 'zh' | 'en' | 'ja' | 'ko';
+export type AIProvider = 'gemini' | 'openai';
 
 export enum AppMode {
   UPLOAD_BASE = 'UPLOAD_BASE',

@@ -1,8 +1,15 @@
-﻿
-import { TryOnConfig, GarmentItem, Language } from "../types";
+
+import { TryOnConfig, GarmentItem, Language, AIProvider } from "../types";
 import { MODEL_IMAGE_EDIT, MODEL_ANALYSIS } from "../constants";
 
-const API_KEY_STORAGE_KEY = "gemini_api_key";
+const STORAGE_KEYS = {
+  provider: "ai_provider",
+  geminiApiKey: "gemini_api_key",
+  openaiApiKey: "openai_api_key",
+} as const;
+
+const OPENAI_TEXT_MODEL = "gpt-4.1-mini";
+const OPENAI_IMAGE_MODEL = "gpt-image-1.5";
 
 const normalizeBase64 = (value: string): string => value.replace(/^data:image\/[a-zA-Z0-9.+-]+;base64,/, "");
 
@@ -12,26 +19,47 @@ const getClient = async (apiKey: string) => {
   return new GoogleGenAI({ apiKey });
 };
 
-export const getStoredApiKey = (): string => {
+const getProviderKey = (provider: AIProvider) => {
+  return provider === "openai" ? STORAGE_KEYS.openaiApiKey : STORAGE_KEYS.geminiApiKey;
+};
+
+export const getStoredProvider = (): AIProvider => {
+  if (typeof window === "undefined") return "gemini";
+  const saved = window.localStorage.getItem(STORAGE_KEYS.provider);
+  return saved === "openai" ? "openai" : "gemini";
+};
+
+export const saveProvider = (provider: AIProvider): void => {
+  if (typeof window === "undefined") return;
+  window.localStorage.setItem(STORAGE_KEYS.provider, provider);
+};
+
+export const getStoredApiKey = (provider: AIProvider = getStoredProvider()): string => {
   if (typeof window === "undefined") return "";
-  const localKey = window.localStorage.getItem(API_KEY_STORAGE_KEY) || "";
+  const key = getProviderKey(provider);
+  const localKey = window.localStorage.getItem(key) || "";
   if (localKey) return localKey;
-  return window.sessionStorage.getItem(API_KEY_STORAGE_KEY) || "";
+  return window.sessionStorage.getItem(key) || "";
 };
 
-export const saveApiKey = (apiKey: string): void => {
+export const saveApiKey = (apiKey: string, provider: AIProvider = getStoredProvider()): void => {
   if (typeof window === "undefined") return;
-  window.localStorage.setItem(API_KEY_STORAGE_KEY, apiKey.trim());
+  const key = getProviderKey(provider);
+  window.localStorage.setItem(key, apiKey.trim());
 };
 
-export const clearApiKey = (): void => {
+export const clearApiKey = (provider?: AIProvider): void => {
   if (typeof window === "undefined") return;
-  window.localStorage.removeItem(API_KEY_STORAGE_KEY);
-  window.sessionStorage.removeItem(API_KEY_STORAGE_KEY);
+  const providers: AIProvider[] = provider ? [provider] : ["gemini", "openai"];
+  providers.forEach((item) => {
+    const key = getProviderKey(item);
+    window.localStorage.removeItem(key);
+    window.sessionStorage.removeItem(key);
+  });
 };
 
-export const checkApiKey = async (): Promise<boolean> => {
-  return Boolean(getStoredApiKey());
+export const checkApiKey = async (provider: AIProvider = getStoredProvider()): Promise<boolean> => {
+  return Boolean(getStoredApiKey(provider));
 };
 
 export const isAuthError = (error: unknown): boolean => {
@@ -41,7 +69,131 @@ export const isAuthError = (error: unknown): boolean => {
   return status === 401 || status === 403 || code === 401 || code === 403 || message.includes("401") || message.includes("403");
 };
 
-export const validateApiKey = async (apiKey: string, timeoutMs = 12000): Promise<boolean> => {
+const parseOpenAIError = async (response: Response): Promise<string> => {
+  try {
+    const json = await response.json();
+    return json?.error?.message || `OpenAI request failed (${response.status})`;
+  } catch {
+    return `OpenAI request failed (${response.status})`;
+  }
+};
+
+const callOpenAIText = async (
+  apiKey: string,
+  prompt: string,
+  imageBase64List: string[] = [],
+  abortSignal?: AbortSignal
+): Promise<string> => {
+  const content: any[] = imageBase64List.map((img) => ({
+    type: "input_image",
+    image_url: `data:image/jpeg;base64,${normalizeBase64(img)}`,
+  }));
+  content.push({ type: "input_text", text: prompt });
+
+  const response = await fetch("https://api.openai.com/v1/responses", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify({
+      model: OPENAI_TEXT_MODEL,
+      input: [{ role: "user", content }],
+    }),
+    signal: abortSignal,
+  });
+
+  if (!response.ok) {
+    throw new Error(await parseOpenAIError(response));
+  }
+
+  const data = await response.json();
+  if (typeof data?.output_text === "string" && data.output_text.trim()) {
+    return data.output_text.trim();
+  }
+
+  const output = data?.output || [];
+  for (const item of output) {
+    if (Array.isArray(item?.content)) {
+      for (const part of item.content) {
+        if (part?.type === "output_text" && typeof part?.text === "string" && part.text.trim()) {
+          return part.text.trim();
+        }
+      }
+    }
+  }
+
+  return "";
+};
+
+const callOpenAIImage = async (
+  apiKey: string,
+  prompt: string,
+  imageBase64List: string[] = [],
+  aspectRatio?: string,
+  abortSignal?: AbortSignal
+): Promise<string> => {
+  const content: any[] = imageBase64List.map((img) => ({
+    type: "input_image",
+    image_url: `data:image/jpeg;base64,${normalizeBase64(img)}`,
+  }));
+  content.push({ type: "input_text", text: prompt });
+
+  const sizeByAspect: Record<string, string> = {
+    "1:1": "1024x1024",
+    "3:4": "1024x1536",
+    "4:3": "1536x1024",
+    "9:16": "1024x1792",
+    "16:9": "1792x1024",
+  };
+
+  const response = await fetch("https://api.openai.com/v1/responses", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify({
+      model: OPENAI_TEXT_MODEL,
+      input: [{ role: "user", content }],
+      tools: [{
+        type: "image_generation",
+        model: OPENAI_IMAGE_MODEL,
+        size: sizeByAspect[aspectRatio || "3:4"] || "1024x1536",
+      }],
+    }),
+    signal: abortSignal,
+  });
+
+  if (!response.ok) {
+    throw new Error(await parseOpenAIError(response));
+  }
+
+  const data = await response.json();
+  const output = data?.output || [];
+  for (const item of output) {
+    if (item?.type === "image_generation_call" && typeof item?.result === "string") {
+      return `data:image/png;base64,${item.result}`;
+    }
+    if (item?.type === "image_generation_call" && typeof item?.b64_json === "string") {
+      return `data:image/png;base64,${item.b64_json}`;
+    }
+    if (Array.isArray(item?.content)) {
+      for (const part of item.content) {
+        if (typeof part?.image_base64 === "string") {
+          return `data:image/png;base64,${part.image_base64}`;
+        }
+        if (typeof part?.b64_json === "string") {
+          return `data:image/png;base64,${part.b64_json}`;
+        }
+      }
+    }
+  }
+
+  throw new Error("No image generated by OpenAI.");
+};
+
+export const validateApiKey = async (apiKey: string, provider: AIProvider = "gemini", timeoutMs = 12000): Promise<boolean> => {
   const trimmed = apiKey.trim();
   if (!trimmed) return false;
   const withTimeout = <T,>(promise: Promise<T>, ms: number) =>
@@ -50,6 +202,10 @@ export const validateApiKey = async (apiKey: string, timeoutMs = 12000): Promise
       new Promise<T>((_, reject) => setTimeout(() => reject(new Error("Validation timeout. Please try again.")), ms))
     ]);
   try {
+    if (provider === "openai") {
+      await withTimeout(callOpenAIText(trimmed, "Reply with OK."), timeoutMs);
+      return true;
+    }
     const ai = await getClient(trimmed);
     await withTimeout(ai.models.generateContent({
       model: MODEL_ANALYSIS,
@@ -112,11 +268,10 @@ export const analyzeOutfit = async (
   apiKey: string,
   base64Image: string,
   lang: Language = 'zh',
-  abortSignal?: AbortSignal
+  abortSignal?: AbortSignal,
+  provider: AIProvider = "gemini"
 ): Promise<string> => {
   return withRetry(async () => {
-    const ai = await getClient(apiKey);
-    
     const langMap = {
       zh: "Traditional Chinese (繁體中文)",
       en: "English",
@@ -151,6 +306,11 @@ export const analyzeOutfit = async (
     `;
   
     try {
+      if (provider === "openai") {
+        const output = await callOpenAIText(apiKey, prompt, [base64Image], abortSignal);
+        return output || "Unable to generate analysis right now. Please try again.";
+      }
+      const ai = await getClient(apiKey);
       const response = await ai.models.generateContent({
         model: MODEL_ANALYSIS, // Using the same model as it handles vision well
         contents: {
@@ -177,11 +337,10 @@ export const extractClothingItem = async (
   apiKey: string,
   base64Image: string,
   targetDescription: string,
-  abortSignal?: AbortSignal
+  abortSignal?: AbortSignal,
+  provider: AIProvider = "gemini"
 ): Promise<string> => {
   return withRetry(async () => {
-    const ai = await getClient(apiKey);
-    
     const prompt = `
       You are a professional product photographer and editor.
       Task: Identify the "${targetDescription}" worn by the person in this image.
@@ -197,6 +356,10 @@ export const extractClothingItem = async (
     `;
   
     try {
+      if (provider === "openai") {
+        return await callOpenAIImage(apiKey, prompt, [base64Image], "1:1", abortSignal);
+      }
+      const ai = await getClient(apiKey);
       const response = await ai.models.generateContent({
         model: MODEL_IMAGE_EDIT,
         contents: {
@@ -231,11 +394,10 @@ export const editModelImage = async (
   apiKey: string,
   base64Image: string,
   promptText: string,
-  abortSignal?: AbortSignal
+  abortSignal?: AbortSignal,
+  provider: AIProvider = "gemini"
 ): Promise<string> => {
   return withRetry(async () => {
-    const ai = await getClient(apiKey);
-  
     const prompt = `
       You are a professional photo retoucher.
       Image 1 is the source image.
@@ -250,6 +412,10 @@ export const editModelImage = async (
     `;
   
     try {
+      if (provider === "openai") {
+        return await callOpenAIImage(apiKey, prompt, [base64Image], "3:4", abortSignal);
+      }
+      const ai = await getClient(apiKey);
       const response = await ai.models.generateContent({
         model: MODEL_IMAGE_EDIT,
         contents: {
@@ -282,11 +448,10 @@ export const generateTryOn = async (
   personImageBase64: string,
   garmentItems: GarmentItem[],
   config: TryOnConfig,
-  abortSignal?: AbortSignal
+  abortSignal?: AbortSignal,
+  provider: AIProvider = "gemini"
 ): Promise<string> => {
   return withRetry(async () => {
-    const ai = await getClient(apiKey);
-  
     // Construct the prompt based on multiple items
     let prompt = `
       You are a professional virtual fashion editor for a high-end fashion magazine.
@@ -367,6 +532,11 @@ export const generateTryOn = async (
     parts.push({ text: prompt });
   
     try {
+      if (provider === "openai") {
+        const openAiInputs = [personImageBase64, ...imageItems.map(item => item.image!).filter(Boolean)];
+        return await callOpenAIImage(apiKey, prompt, openAiInputs, config.aspectRatio, abortSignal);
+      }
+      const ai = await getClient(apiKey);
       const response = await ai.models.generateContent({
         model: MODEL_IMAGE_EDIT,
         contents: { parts },
