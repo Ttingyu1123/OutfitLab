@@ -1,15 +1,13 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import Button from './Button';
 import { clearApiKey, saveApiKey, validateApiKey } from '../services/geminiService';
-import { AIProvider, Language } from '../types';
+import { Language } from '../types';
 
 interface ApiKeyModalProps {
-  onSuccess: (apiKey: string, provider: AIProvider) => void;
+  onSuccess: (apiKey: string) => void;
   onClose?: () => void;
   lang: Language;
   initialValue?: string;
-  provider: AIProvider;
-  onProviderChange: (provider: AIProvider) => void;
 }
 
 const ApiKeyModal: React.FC<ApiKeyModalProps> = ({
@@ -17,8 +15,6 @@ const ApiKeyModal: React.FC<ApiKeyModalProps> = ({
   onClose,
   lang,
   initialValue = '',
-  provider,
-  onProviderChange
 }) => {
   const [isSaving, setIsSaving] = useState(false);
   const [isTesting, setIsTesting] = useState(false);
@@ -28,27 +24,22 @@ const ApiKeyModal: React.FC<ApiKeyModalProps> = ({
   const [rememberKey, setRememberKey] = useState(true);
 
   const isZh = lang === 'zh';
-  const providerName = provider === 'gemini' ? 'Gemini' : 'OpenAI';
-  const providerLink = provider === 'gemini' ? 'https://aistudio.google.com/apikey' : 'https://platform.openai.com/api-keys';
-  const keyPlaceholder = provider === 'gemini' ? 'AIza...' : 'sk-...';
-  const sessionStorageKey = provider === 'gemini' ? 'gemini_api_key' : 'openai_api_key';
-
   const trimmedKey = useMemo(() => inputKey.trim(), [inputKey]);
 
   useEffect(() => {
     setInputKey(initialValue);
     setError(null);
     setStatus(null);
-  }, [initialValue, provider]);
+  }, [initialValue]);
 
   const persistKey = (apiKey: string) => {
     if (rememberKey) {
-      saveApiKey(apiKey, provider);
-      sessionStorage.removeItem(sessionStorageKey);
+      saveApiKey(apiKey);
+      sessionStorage.removeItem('gemini_api_key');
       return;
     }
-    clearApiKey(provider);
-    sessionStorage.setItem(sessionStorageKey, apiKey);
+    clearApiKey();
+    sessionStorage.setItem('gemini_api_key', apiKey);
   };
 
   const handleTest = async () => {
@@ -60,7 +51,7 @@ const ApiKeyModal: React.FC<ApiKeyModalProps> = ({
     setError(null);
     setStatus(null);
     try {
-      const ok = await validateApiKey(trimmedKey, provider);
+      const ok = await validateApiKey(trimmedKey);
       if (!ok) {
         setError(isZh ? 'API Key 測試失敗，請確認 Key 是否有效。' : 'API key appears invalid.');
         return;
@@ -84,7 +75,7 @@ const ApiKeyModal: React.FC<ApiKeyModalProps> = ({
     setStatus(null);
     try {
       persistKey(trimmedKey);
-      onSuccess(trimmedKey, provider);
+      onSuccess(trimmedKey);
     } catch (err: any) {
       console.error(err);
       setError(err?.message || (isZh ? '儲存失敗，請再試一次。' : 'Save failed, please retry.'));
@@ -97,8 +88,8 @@ const ApiKeyModal: React.FC<ApiKeyModalProps> = ({
     setInputKey('');
     setStatus(null);
     setError(null);
-    clearApiKey(provider);
-    sessionStorage.removeItem(sessionStorageKey);
+    clearApiKey();
+    sessionStorage.removeItem('gemini_api_key');
   };
 
   return (
@@ -111,37 +102,25 @@ const ApiKeyModal: React.FC<ApiKeyModalProps> = ({
             </svg>
           </div>
           <h2 className="text-[34px] font-semibold text-[#4E445A] leading-tight">
-            {isZh ? `輸入您的 ${providerName} API Key` : `Enter your ${providerName} API Key`}
+            {isZh ? '輸入您的 Gemini API Key' : 'Enter your Gemini API Key'}
           </h2>
           <p className="text-sm text-[#6F647C] leading-6">
             {isZh
-              ? `我們需要您的 ${providerName} API Key 來執行 AI 生成。金鑰僅儲存在您的瀏覽器。`
-              : `We need your ${providerName} API key for AI generation. Your key stays in your browser only.`}
+              ? '我們需要您的 Gemini API Key 來執行 AI 生成。金鑰僅儲存在您的瀏覽器。'
+              : 'We need your Gemini API key for AI generation. Your key stays in your browser only.'}
           </p>
-          <a href={providerLink} target="_blank" rel="noreferrer" className="text-[#8C73AD] text-sm underline underline-offset-4">
+          <a href="https://aistudio.google.com/apikey" target="_blank" rel="noreferrer" className="text-[#8C73AD] text-sm underline underline-offset-4">
             {isZh ? '獲取 API Key' : 'Get API Key'}
           </a>
         </div>
 
         <div className="space-y-2">
-          <label className="block text-sm text-[#71657E]">{isZh ? 'AI 服務商' : 'AI Provider'}</label>
-          <select
-            value={provider}
-            onChange={(e) => onProviderChange(e.target.value as AIProvider)}
-            className="w-full rounded-2xl border border-[#BFD5D2] bg-[#D4E3E2] px-4 py-3 text-[#3D3651] outline-none focus:ring-2 focus:ring-[#A98ABF]"
-          >
-            <option value="gemini">Google Gemini</option>
-            <option value="openai">OpenAI</option>
-          </select>
-        </div>
-
-        <div className="space-y-2">
-          <label className="block text-sm text-[#71657E]">{providerName} API Key</label>
+          <label className="block text-sm text-[#71657E]">Gemini API Key</label>
           <input
             type="password"
             value={inputKey}
             onChange={(e) => setInputKey(e.target.value)}
-            placeholder={keyPlaceholder}
+            placeholder="AIza..."
             className="w-full rounded-2xl border border-[#BFD5D2] bg-[#D4E3E2] px-4 py-3 text-[#3D3651] tracking-wide outline-none focus:ring-2 focus:ring-[#A98ABF]"
           />
         </div>
@@ -167,7 +146,7 @@ const ApiKeyModal: React.FC<ApiKeyModalProps> = ({
           <div className="text-[#736281] font-medium mb-2">{isZh ? '安全聲明' : 'Security Notice'}</div>
           <ul className="list-disc pl-4 text-sm text-[#756A83] space-y-1">
             <li>{isZh ? '金鑰僅存在你的瀏覽器儲存空間，不會上傳到你的伺服器。' : 'Key is stored only in your browser storage, not uploaded to your server.'}</li>
-            <li>{isZh ? `前端直接呼叫 ${providerName} API，請使用 HTTPS 環境。` : `Frontend calls ${providerName} API directly; use HTTPS environment.`}</li>
+            <li>{isZh ? '前端直接呼叫 Gemini API，請使用 HTTPS 環境。' : 'Frontend calls Gemini API directly; use HTTPS environment.'}</li>
             <li>{isZh ? '建議定期輪替金鑰，公用裝置使用後請清除。' : 'Rotate keys periodically and clear on shared devices.'}</li>
           </ul>
         </div>
@@ -197,4 +176,3 @@ const ApiKeyModal: React.FC<ApiKeyModalProps> = ({
 };
 
 export default ApiKeyModal;
-

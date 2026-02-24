@@ -3,9 +3,9 @@ import ApiKeyModal from './components/ApiKeyModal';
 import ImageUploader from './components/ImageUploader';
 import Button from './components/Button';
 import ToastContainer, { ToastMessage, ToastType } from './components/Toast';
-import { AppMode, TryOnConfig, GarmentItem, Language, AIProvider } from './types';
+import { AppMode, TryOnConfig, GarmentItem, Language } from './types';
 import { HistoryItem } from './types/history';
-import { checkApiKey, extractClothingItem, generateTryOn, analyzeOutfit, editModelImage, getStoredApiKey, clearApiKey, isAuthError, getStoredProvider, saveProvider } from './services/geminiService';
+import { checkApiKey, extractClothingItem, generateTryOn, analyzeOutfit, editModelImage, getStoredApiKey, clearApiKey, isAuthError } from './services/geminiService';
 import { loadHistoryFromDb, saveHistoryToDb } from './services/historyStorage';
 import { CLOTHING_CATEGORIES, STUDIO_STYLES, ASPECT_RATIOS, CUSTOM_BG_KEY, TRANSLATIONS } from './constants';
 import { STYLE_PRESETS } from './locales/stylePresets';
@@ -26,7 +26,6 @@ const App: React.FC = () => {
 
   const [isKeySet, setIsKeySet] = useState(false);
   const [apiKey, setApiKey] = useState('');
-  const [apiProvider, setApiProvider] = useState<AIProvider>('gemini');
   const [showApiKeyModal, setShowApiKeyModal] = useState(false);
   
   // Reset Key used to force re-render of components with internal state (like ImageUploader)
@@ -64,6 +63,7 @@ const App: React.FC = () => {
   const [isAnalysisOpen, setIsAnalysisOpen] = useState(false);
   const [analysisResult, setAnalysisResult] = useState<string | null>(null);
   const [recommendations, setRecommendations] = useState<string[]>([]);
+  const [failureDialog, setFailureDialog] = useState<{ title: string; reason: string } | null>(null);
 
   // Configuration States
   const [col1ToolMode, setCol1ToolMode] = useState<'extract' | 'edit' | 'recolor'>('extract');
@@ -112,12 +112,10 @@ const App: React.FC = () => {
   }, [uiTextSize]);
 
   useEffect(() => {
-    const provider = getStoredProvider();
-    setApiProvider(provider);
-    checkApiKey(provider).then((hasKey) => {
+    checkApiKey().then((hasKey) => {
       setIsKeySet(hasKey);
       if (hasKey) {
-        setApiKey(getStoredApiKey(provider));
+        setApiKey(getStoredApiKey());
       }
     });
   }, []);
@@ -190,7 +188,7 @@ const App: React.FC = () => {
   const textSizeNormal = '標準';
   const textSizeComfortable = '舒適';
   const textSizeLarge = '較大';
-  const providerLabel = apiProvider === 'gemini' ? 'Google Gemini' : 'OpenAI';
+  const isZh = lang === 'zh';
 
   const isRequestAbortError = (error: unknown) => {
     const message = String((error as any)?.message || '').toLowerCase();
@@ -211,7 +209,7 @@ const App: React.FC = () => {
   };
 
   const handleAuthFailure = (fallbackMessage: string) => {
-    clearApiKey(apiProvider);
+    clearApiKey();
     setApiKey('');
     setIsKeySet(false);
     setShowApiKeyModal(false);
@@ -223,6 +221,19 @@ const App: React.FC = () => {
     setShowApiKeyModal(true);
     addToast("Please connect API key first.", "warning");
     return false;
+  };
+
+  const extractErrorReason = (error: unknown, fallback: string) => {
+    const message = String((error as any)?.message || '').trim();
+    if (!message || message === '[object Object]') return fallback;
+    return message;
+  };
+
+  const openFailureDialog = (fallback: string, error: unknown) => {
+    setFailureDialog({
+      title: isZh ? '生成失敗' : 'Generation Failed',
+      reason: extractErrorReason(error, fallback),
+    });
   };
 
   // --- Handlers ---
@@ -242,7 +253,7 @@ const App: React.FC = () => {
     const controller = startRequestController();
 
     try {
-      const result = await analyzeOutfit(apiKey, baseImage, lang, controller.signal, apiProvider);
+      const result = await analyzeOutfit(apiKey, baseImage, lang, controller.signal);
       setAnalysisResult(result);
 
       const jsonMatch = result.match(/```json\s*([\s\S]*?)\s*```/);
@@ -261,9 +272,13 @@ const App: React.FC = () => {
         return;
       }
       if (isAuthError(e)) {
-        handleAuthFailure("API key is invalid or expired. Please reconnect.");
+        const authMsg = "API key is invalid or expired. Please reconnect.";
+        handleAuthFailure(authMsg);
+        openFailureDialog(authMsg, e);
       } else {
-        addToast("Analysis failed", 'error');
+        const failMsg = "Analysis failed.";
+        addToast(failMsg, 'error');
+        openFailureDialog(failMsg, e);
       }
       setAnalysisResult("Error during analysis. Please try again.");
       console.error(e);
@@ -294,7 +309,7 @@ const App: React.FC = () => {
     }
 
     try {
-      const result = await extractClothingItem(apiKey, baseImage, targetDescription, controller.signal, apiProvider);
+      const result = await extractClothingItem(apiKey, baseImage, targetDescription, controller.signal);
       setResultImage(result);
       setResultType('extracted');
 
@@ -315,9 +330,12 @@ const App: React.FC = () => {
         return;
       }
       if (isAuthError(e)) {
-        handleAuthFailure("API key is invalid or expired. Please reconnect.");
+        const authMsg = "API key is invalid or expired. Please reconnect.";
+        handleAuthFailure(authMsg);
+        openFailureDialog(authMsg, e);
       } else {
         addToast(t.toast_extract_fail, 'error');
+        openFailureDialog(t.toast_extract_fail, e);
       }
       console.error(e);
     } finally {
@@ -341,7 +359,7 @@ const App: React.FC = () => {
     const controller = startRequestController();
 
     try {
-      const result = await editModelImage(apiKey, baseImage, magicEditInput, controller.signal, apiProvider);
+      const result = await editModelImage(apiKey, baseImage, magicEditInput, controller.signal);
       // const rawBase64 = result.replace(/^data:image\/[a-z]+;base64,/, "");
       
       // Removed auto-update of baseImage
@@ -367,9 +385,12 @@ const App: React.FC = () => {
         return;
       }
       if (isAuthError(e)) {
-        handleAuthFailure("API key is invalid or expired. Please reconnect.");
+        const authMsg = "API key is invalid or expired. Please reconnect.";
+        handleAuthFailure(authMsg);
+        openFailureDialog(authMsg, e);
       } else {
         addToast(t.toast_edit_fail, 'error');
+        openFailureDialog(t.toast_edit_fail, e);
       }
       console.error(e);
     } finally {
@@ -395,7 +416,7 @@ const App: React.FC = () => {
     const prompt = `Change the color of the ${recolorTarget} to ${recolorValue}. IMPORTANT: Keep the original material texture, shading, and lighting exact. Only change the hue/saturation.`;
 
     try {
-      const result = await editModelImage(apiKey, baseImage, prompt, controller.signal, apiProvider);
+      const result = await editModelImage(apiKey, baseImage, prompt, controller.signal);
       // const rawBase64 = result.replace(/^data:image\/[a-z]+;base64,/, "");
       
       // Removed auto-update of baseImage
@@ -420,9 +441,12 @@ const App: React.FC = () => {
         return;
       }
       if (isAuthError(e)) {
-        handleAuthFailure("API key is invalid or expired. Please reconnect.");
+        const authMsg = "API key is invalid or expired. Please reconnect.";
+        handleAuthFailure(authMsg);
+        openFailureDialog(authMsg, e);
       } else {
         addToast(t.toast_edit_fail, 'error');
+        openFailureDialog(t.toast_edit_fail, e);
       }
       console.error(e);
     } finally {
@@ -519,7 +543,7 @@ const App: React.FC = () => {
     setLastSubmittedConfig(finalConfig);
 
     try {
-      const result = await generateTryOn(apiKey, baseImage, currentItems, finalConfig, controller.signal, apiProvider);
+      const result = await generateTryOn(apiKey, baseImage, currentItems, finalConfig, controller.signal);
       setResultImage(result);
       setResultType('generated');
       
@@ -540,9 +564,12 @@ const App: React.FC = () => {
         return;
       }
       if (isAuthError(e)) {
-        handleAuthFailure("API key is invalid or expired. Please reconnect.");
+        const authMsg = "API key is invalid or expired. Please reconnect.";
+        handleAuthFailure(authMsg);
+        openFailureDialog(authMsg, e);
       } else {
         addToast(t.toast_tryon_fail, 'error');
+        openFailureDialog(t.toast_tryon_fail, e);
       }
       console.error(e);
     } finally {
@@ -691,26 +718,42 @@ const App: React.FC = () => {
 
       {showApiKeyModal && (
         <ApiKeyModal
-          onSuccess={(nextKey, nextProvider) => {
-            saveProvider(nextProvider);
-            setApiProvider(nextProvider);
+          onSuccess={(nextKey) => {
             setApiKey(nextKey);
             setIsKeySet(true);
             setShowApiKeyModal(false);
             addToast("API key updated.", "success");
           }}
           onClose={() => setShowApiKeyModal(false)}
-          provider={apiProvider}
-          onProviderChange={(nextProvider) => {
-            saveProvider(nextProvider);
-            setApiProvider(nextProvider);
-            const nextKey = getStoredApiKey(nextProvider);
-            setApiKey(nextKey);
-            setIsKeySet(Boolean(nextKey));
-          }}
           lang={lang}
           initialValue={apiKey}
         />
+      )}
+
+      {failureDialog && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm">
+          <div className="w-full max-w-lg rounded-2xl border border-rose-200 bg-white shadow-2xl p-5">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <h3 className="text-lg font-semibold text-rose-700">{failureDialog.title}</h3>
+                <p className="mt-2 text-sm text-slate-700 whitespace-pre-wrap break-words">{failureDialog.reason}</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setFailureDialog(null)}
+                className="rounded-lg px-2 py-1 text-slate-400 hover:text-slate-700 hover:bg-slate-100"
+                aria-label="Close error dialog"
+              >
+                ✕
+              </button>
+            </div>
+            <div className="mt-4 flex justify-end">
+              <Button variant="secondary" className="rounded-xl px-5" onClick={() => setFailureDialog(null)}>
+                {isZh ? '知道了' : 'OK'}
+              </Button>
+            </div>
+          </div>
+        </div>
       )}
       
       <Suspense fallback={null}>
@@ -788,10 +831,6 @@ const App: React.FC = () => {
             <option value="ko">한국어</option>
           </select>
 
-          <span className="hidden md:inline-flex items-center rounded-full border border-slate-200 bg-white/80 px-3 py-1 text-xs text-slate-600">
-            Provider: {providerLabel}
-          </span>
-
           <button
             type="button"
             onClick={() => setShowApiKeyModal(true)}
@@ -800,9 +839,7 @@ const App: React.FC = () => {
           >
             <span className={`absolute right-1 top-1 h-2.5 w-2.5 rounded-full border border-white ${apiKey ? 'bg-emerald-500' : 'bg-rose-500'}`} />
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-6 h-6">
-              <path fillRule="evenodd" d="M15.75 1.5a.75.75 0 01.75.75V4.5h.75a3.75 3.75 0 013.75 3.75v2.432a1.5 1.5 0 01-.44 1.06l-5.25 5.25a1.5 1.5 0 01-1.06.44H11.25a3.75 3.75 0 01-3.75-3.75V9.75A3.75 3.75 0 0111.25 6h.75V2.25a.75.75 0 01.75-.75h3zm-2.25 4.5h1.5V3h-1.5v3zm-2.25 1.5A2.25 2.25 0 009 9.75v3.932c0 .596.237 1.169.659 1.591a2.25 2.25 0 001.591.659h3.932a.75.75 0 00.53-.22l5.038-5.038V8.25A2.25 2.25 0 0018.5 6h-7.25z" clipRule="evenodd" />
-              <path d="M5.03 13.97a.75.75 0 011.06 0l2.94 2.94a.75.75 0 11-1.06 1.06l-2.94-2.94a.75.75 0 010-1.06z" />
-              <path d="M2.25 16.5a.75.75 0 00-.75.75v1.5A3.75 3.75 0 005.25 22.5h1.5a.75.75 0 000-1.5h-1.5A2.25 2.25 0 013 18.75v-1.5a.75.75 0 00-.75-.75z" />
+              <path fillRule="evenodd" d="M15.75 1.5a6.75 6.75 0 00-6.657 7.87L2.97 15.493a.75.75 0 00-.22.53V19.5c0 .414.336.75.75.75H7.5a.75.75 0 00.75-.75V18h1.5a.75.75 0 00.75-.75v-1.5H12a.75.75 0 00.53-.22l1.87-1.87a6.75 6.75 0 101.35-13.16zm0 1.5a5.25 5.25 0 11-3.712 8.962.75.75 0 00-1.06 0l-2.09 2.09a.75.75 0 01-.53.22H6.75v1.5a.75.75 0 01-.75.75H4.5v2.25h2.25V18a.75.75 0 01.75-.75H9v-1.5a.75.75 0 01.75-.75h1.19l1.558-1.559a.75.75 0 000-1.06A5.25 5.25 0 0115.75 3z" clipRule="evenodd" />
             </svg>
           </button>
 
